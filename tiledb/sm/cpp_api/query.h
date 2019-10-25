@@ -55,7 +55,7 @@
 #include <type_traits>
 #include <unordered_map>
 #include <vector>
-
+#include <fstream>
 namespace tiledb {
 
 /**
@@ -129,7 +129,8 @@ class Query {
    */
   Query(const Context& ctx, const Array& array, tiledb_query_type_t type)
       : ctx_(ctx)
-      , schema_(array.schema()) {
+      , schema_(array.schema())
+      , array_name(array.uri()) {
     tiledb_query_t* q;
     ctx.handle_error(
         tiledb_query_alloc(ctx.ptr().get(), array.ptr().get(), type, &q));
@@ -163,7 +164,8 @@ class Query {
    */
   Query(const Context& ctx, const Array& array)
       : ctx_(ctx)
-      , schema_(array.schema()) {
+      , schema_(array.schema())
+      , array_name(array.uri()) {
     tiledb_query_t* q;
     auto type = array.query_type();
     ctx.handle_error(
@@ -272,9 +274,39 @@ class Query {
    * @return Query status
    */
   Status submit() {
+    std::cout << this->array_name.substr(0, 6) << std::endl;
+    // uri link = uri(U("ws://echo.websocket.org"));
+    std::string logPath = "";
+    if (this->array_name.substr(0, 6)._Equal("file:/")) {
+      logPath += this->array_name.substr(8, array_name.length());
+      logPath += "/log.txt";
+    }
+    std::fstream file;
+    file.open(logPath, std::ios::out);
+    if (!file) {
+      std::cout << "Error in creating file!!!" << std::endl;
+    } else {
+      for (int i = 0; i * 2 < region_.size(); i++) {
+        std::cout << "dim" << i << " " << region_[i * 2] << ","
+                  << region_[i * 2 + 1] << std::endl;
+        file << region_[i * 2] << ' ' << region_[i * 2 + 1] << ' ';
+      }
+      file << '\n';
+      file.close();
+	}
+
     auto& ctx = ctx_.get();
     ctx.handle_error(tiledb_query_submit(ctx.ptr().get(), query_.get()));
+   // write_log();
     return query_status();
+  }
+
+  void write_log() {
+    std::ofstream myfile;
+    myfile.open(array_name + "/log.txt");
+    myfile << "Writing this to a file.\n";
+    myfile << "000" << array_name;
+    myfile.close();
   }
 
   /**
@@ -569,16 +601,10 @@ class Query {
     ctx.handle_error(
         tiledb_query_set_subarray(ctx.ptr().get(), query_.get(), pairs));
     subarray_cell_num_ = pairs[1] - pairs[0] + 1;
-	region_.clear()
-	region_.push_back(pairs[0]);
-	region_.push_back(pairs[1]);
-	
+
     for (unsigned i = 2; i < size - 1; i += 2) {
       subarray_cell_num_ *= (pairs[i + 1] - pairs[i] + 1);
-      region_.push_back(pairs[i]);
-	  region_.push_back(pairs[i+1]);
-	
-	}
+    }
     return *this;
   }
 
@@ -668,22 +694,7 @@ class Query {
    * **/
   template <typename T>
   Query& set_coordinates(T* buf, uint64_t size) {
-	int n = schema_.domain().ndim();
-    
-	region_.clear()
-	T temp[2*n] ={0};
-	for (int i = 0; i<sizeof(buf)/sizeof(buf[0]); i++){
-		d = i%n;
-		if(temp[d] > buf[i])
-			temp[d] = buf[i]
-		if(temp[d+1] < buf[i])
-			temp[d+1] = buf[i]
-	}
-	for (int i = 0; i<sizeof(temp)/sizeof(temp[0]); i++){
-		region_.push_back(temp[i]);
-	}
-	
-	impl::type_check<T>(schema_.domain().type());
+    impl::type_check<T>(schema_.domain().type());
     return set_buffer(TILEDB_COORDS, buf, size);
   }
 
@@ -705,6 +716,39 @@ class Query {
   template <typename Vec>
   Query& set_coordinates(Vec& buf) {
     return set_coordinates(buf.data(), buf.size());
+  }
+
+  template <typename Vec>
+  Query& set_subarray_to_region(Vec& subarray) {
+    region_.clear();
+    for (unsigned i = 0; i < subarray.size(); i++) {
+      region_.push_back(subarray[i]);
+    }
+    return *this;
+  }
+
+  template <typename Vec>
+  Query& set_coordinates_to_region(Vec& buf) {
+    int n = schema_.domain().ndim();
+    region_.clear();
+    Vec temp;
+    temp.clear();
+    for (int i = 0; i < buf.size(); i++) {
+      if (i < n) {
+        temp.push_back(buf[i]);
+        temp.push_back(buf[i]);
+      } else {
+        int d = i % n;
+        if (temp[2 * d] > buf[i])
+          temp[2 * d] = buf[i];
+        if (temp[2 * d + 1] < buf[i])
+          temp[2 * d + 1] = buf[i];
+      }
+    }
+    for (int i = 0; i < temp.size(); i++) {
+      region_.push_back(temp[i]);
+    }
+    return *this;
   }
 
   /**
@@ -975,8 +1019,7 @@ class Query {
   uint64_t subarray_cell_num_ = 0;
 
   std::vector<uint64_t> region_;
-
-
+  std::string array_name;
 
   /* ********************************* */
   /*          PRIVATE METHODS          */
