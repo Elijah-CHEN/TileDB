@@ -537,41 +537,6 @@ class Query {
   }
 
   /**
-   * Returns the number of written fragments. Applicable only to WRITE queries.
-   */
-  uint32_t fragment_num() const {
-    auto& ctx = ctx_.get();
-    uint32_t num;
-    ctx.handle_error(
-        tiledb_query_get_fragment_num(ctx.ptr().get(), query_.get(), &num));
-    return num;
-  }
-
-  /**
-   * Returns the URI of the written fragment with the input index. Applicable
-   * only to WRITE queries.
-   */
-  std::string fragment_uri(uint32_t idx) const {
-    auto& ctx = ctx_.get();
-    const char* uri;
-    ctx.handle_error(tiledb_query_get_fragment_uri(
-        ctx.ptr().get(), query_.get(), idx, &uri));
-    return uri;
-  }
-
-  /**
-   * Returns the timestamp range of the written fragment with the input index.
-   * Applicable only to WRITE queries.
-   */
-  std::pair<uint64_t, uint64_t> fragment_timestamp_range(uint32_t idx) const {
-    auto& ctx = ctx_.get();
-    uint64_t t1, t2;
-    ctx.handle_error(tiledb_query_get_fragment_timestamp_range(
-        ctx.ptr().get(), query_.get(), idx, &t1, &t2));
-    return std::make_pair(t1, t2);
-  }
-
-  /**
    * Sets a subarray, defined in the order dimensions were added.
    * Coordinates are inclusive. For the case of writes, this is meaningful only
    * for dense arrays, and specifically dense writes.
@@ -604,9 +569,16 @@ class Query {
     ctx.handle_error(
         tiledb_query_set_subarray(ctx.ptr().get(), query_.get(), pairs));
     subarray_cell_num_ = pairs[1] - pairs[0] + 1;
+	region_.clear()
+	region_.push_back(pairs[0]);
+	region_.push_back(pairs[1]);
+	
     for (unsigned i = 2; i < size - 1; i += 2) {
       subarray_cell_num_ *= (pairs[i + 1] - pairs[i] + 1);
-    }
+      region_.push_back(pairs[i]);
+	  region_.push_back(pairs[i+1]);
+	
+	}
     return *this;
   }
 
@@ -696,7 +668,22 @@ class Query {
    * **/
   template <typename T>
   Query& set_coordinates(T* buf, uint64_t size) {
-    impl::type_check<T>(schema_.domain().type());
+	int n = schema_.domain().ndim();
+    
+	region_.clear()
+	T temp[2*n] ={0};
+	for (int i = 0; i<sizeof(buf)/sizeof(buf[0]); i++){
+		d = i%n;
+		if(temp[d] > buf[i])
+			temp[d] = buf[i]
+		if(temp[d+1] < buf[i])
+			temp[d+1] = buf[i]
+	}
+	for (int i = 0; i<sizeof(temp)/sizeof(temp[0]); i++){
+		region_.push_back(temp[i]);
+	}
+	
+	impl::type_check<T>(schema_.domain().type());
     return set_buffer(TILEDB_COORDS, buf, size);
   }
 
@@ -986,6 +973,10 @@ class Query {
 
   /** Number of cells set by `set_subarray`, influences `resize_buffer`. */
   uint64_t subarray_cell_num_ = 0;
+
+  std::vector<uint64_t> region_;
+
+
 
   /* ********************************* */
   /*          PRIVATE METHODS          */
