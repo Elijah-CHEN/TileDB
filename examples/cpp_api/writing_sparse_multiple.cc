@@ -75,6 +75,7 @@ void write_array() {
   query_1.set_layout(TILEDB_UNORDERED)
       .set_buffer("a", data_1)
       .set_coordinates(coords_1);
+	  .set_coordinates_to_region(coords_1);
   query_1.submit();
 
   // Second write
@@ -84,6 +85,7 @@ void write_array() {
   query_2.set_layout(TILEDB_UNORDERED)
       .set_buffer("a", data_2)
       .set_coordinates(coords_2);
+	  .set_coordinates_to_region(coords_2);
   query_2.submit();
 
   // Close the array
@@ -107,7 +109,8 @@ void read_array() {
   query.set_subarray(subarray)
       .set_layout(TILEDB_ROW_MAJOR)
       .set_buffer("a", data)
-      .set_coordinates(coords);
+      .set_coordinates(coords)
+	  .set_subarray_to_region(subarray);
 
   // Submit the query and close the array.
   query.submit();
