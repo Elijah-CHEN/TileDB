@@ -281,7 +281,31 @@ class Query {
       logPath += this->array_name.substr(8, array_name.length());
       logPath += "/log.txt";
     }
-    std::fstream file;
+	write_log(logPath);
+
+
+    auto& ctx = ctx_.get();
+    ctx.handle_error(tiledb_query_submit(ctx.ptr().get(), query_.get()));
+   // write_log();
+    return query_status();
+  }
+
+  void write_log(string logPath) {
+    const std::string fileName = logPath;
+    std::fstream processedFile(fileName.c_str());
+    std::stringstream fileData;
+
+	for (int i = 0; i * 2 < region_.size(); i++) 
+        fileData << region_[i * 2] << ' ' << region_[i * 2 + 1] << ' ';
+	
+
+    fileData << processedFile.rdbuf();
+    processedFile.close();
+
+    processedFile.open(fileName.c_str(), std::fstream::out | std::fstream::trunc); 
+    processedFile << fileData.rdbuf();
+	
+	/*std::fstream file;
     file.open(logPath, std::ios::out);
     if (!file) {
       std::cout << "Error in creating file!!!" << std::endl;
@@ -294,19 +318,7 @@ class Query {
       file << '\n';
       file.close();
 	}
-
-    auto& ctx = ctx_.get();
-    ctx.handle_error(tiledb_query_submit(ctx.ptr().get(), query_.get()));
-   // write_log();
-    return query_status();
-  }
-
-  void write_log() {
-    std::ofstream myfile;
-    myfile.open(array_name + "/log.txt");
-    myfile << "Writing this to a file.\n";
-    myfile << "000" << array_name;
-    myfile.close();
+	*/
   }
 
   /**

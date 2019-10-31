@@ -74,7 +74,7 @@ void write_array() {
   Query query_1(ctx, array);
   query_1.set_layout(TILEDB_UNORDERED)
       .set_buffer("a", data_1)
-      .set_coordinates(coords_1);
+      .set_coordinates(coords_1)
       .set_coordinates_to_region(coords_1);// new function for write log 
   query_1.submit();
 
@@ -84,7 +84,7 @@ void write_array() {
   Query query_2(ctx, array);
   query_2.set_layout(TILEDB_UNORDERED)
       .set_buffer("a", data_2)
-      .set_coordinates(coords_2);
+      .set_coordinates(coords_2)
       .set_coordinates_to_region(coords_2); // new function for write log
   query_2.submit();
 
